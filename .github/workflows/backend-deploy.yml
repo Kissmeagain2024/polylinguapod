@@ -1,0 +1,39 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        project_id: ${{ secrets.GCP_PROJECT }}
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        export_default_credentials: true
+
+    - name: Configure Docker to use Google Cloud Registry
+      run: |-
+        gcloud auth configure-docker
+
+    - name: Build and Push Docker image
+      run: |-
+        docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/polylinguapod-backend backend/
+        docker push gcr.io/${{ secrets.GCP_PROJECT }}/polylinguapod-backend
+
+    - name: Deploy to Cloud Run
+      run: |-
+        gcloud run deploy polylinguapod-backend \
+          --image gcr.io/${{ secrets.GCP_PROJECT }}/polylinguapod-backend \
+          --region ${{ secrets.GCP_REGION }} \
+          --platform managed \
+          --allow-unauthenticated \
+          --service-account ${{ secrets.GCP_SA_EMAIL }} \
+          --set-env-vars OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }},ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }},D_ID_API_KEY=${{ secrets.D_ID_API_KEY }},GCP_PROJECT=${{ secrets.GCP_PROJECT }},GCS_BUCKET=${{ secrets.GCS_BUCKET }}
+
